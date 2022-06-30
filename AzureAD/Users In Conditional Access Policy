@@ -1,0 +1,190 @@
+<#
+
+This script is intended to connect to AzureAD, pull the list of Conditional Access policies, and return a list of included and excluded users and groups.
+The expected format for running this script is .\[name of script] -Tenant "[string]" where -Tenant is the name of the tenant this script is being run against.
+
+#>
+
+#Declaring variables and ensuring there's not unexpected information in the memory location for them.
+param([Parameter(Mandatory = $true)]$Tenant)
+
+$Report = ''
+$Policies = ''
+$policy = ''
+$customobject = ''
+$user = ''
+$IncludedUsers = ''
+$includeduser = ''
+$includedADUsername = ''
+$includedADUser = ''
+$includedADDisplayname = ''
+$ExcludedUsers = ''
+$excludeduser = ''
+$ExcludedADUsername = ''
+$ExcludedADUser = ''
+$ExcludedADDisplayname = ''
+$group = ''
+$IncludedGroups = ''
+$includedgroup = ''
+$includedADGroupname = ''
+$includedADgroup = ''
+$includedADGroupDisplayname = ''
+$ExcludedGroups = ''
+$excludedgroup = ''
+$ExcludedADGroupname = ''
+$ExcludedADGroup = ''
+$ExcludedADGroupDisplayname = ''
+
+
+#Log into Azure
+Connect-AzureAD
+
+#Pull all conditional access policies
+$Policies = @(Get-AzureADMSConditionalAccessPolicy)
+
+#Checks if they have policies. If they do not, stop and write to console. If they do, proceed.
+If ($Policies -eq $Null){
+     $Report = "No Policies Found"
+     
+     Write-Output $Report
+}
+else{
+     #Cycles through each Policy. This function will grab the display name of each policy, the include and excluded users, and the included and excluded groups. The information from each policy is put into an array in $Report
+     $Report = foreach ($policy in $Policies){
+     
+          #Creates a customobject to store information.
+          $customobject = New-Object -TypeName psobject
+          
+          #Pulls the display name of the current policy and adds it to $customobject under the title "Display Name".
+          $customobject | Add-Member -Membertype Noteproperty -Name "Display Name" -Value $Policy.displayname
+     
+          #This loops through each GUID in the Include Users section of the policy and pulls the display name of the associated Azure AD record out.
+          $IncludedUsers = foreach($includeduser in $Policy.Conditions.Users.IncludeUsers){
+               #Checks if All users are included, No users are included, or if the value isn't setup. If true, puts the result into a string. If false, gets the display name of the Azure AD record.
+               If ($includeduser -eq "All" -or $includeduser -eq "None" -or $Includeduser -eq $Null){
+                    $includedADUsername = [string]$IncludedUser
+               }
+               else{
+                    #Cycles through each GUID to pull the display name of the Azure AD user.
+                    $IncludedADUsername = foreach ($user in $IncludedUser){
+                         #Looks up the Azure AD accounts associated with the GUID.
+                         $IncludedADUser = get-AzureADUser -ObjectId $user
+                         #Pulls the display name of the account.
+                         $IncludedADDisplayname = $IncludedADUser.DisplayName
+                         #Returns the display name to be put into the $IncludedADUsername array.
+                         $IncludedADDisplayname
+                    }
+               }
+               #Returns the result of the above if/else to be put into the $IncludedUsers array.
+               $IncludedADUsername
+
+          }
+
+          #Convert the $IncludedUsers array into a string.
+          $IncludedUsers = [string]$IncludedUsers
+
+          #Adds the information in the $IncludedUsers string to $customobject as a new field with the title 'Included Users'.
+          $customobject | Add-Member -Membertype Noteproperty -Name "Included Users" -Value $IncludedUsers          
+
+          #Same as above except for Excluded Users.
+          $ExcludedUsers = foreach ($excludeduser in $Policy.conditions.users.excludeusers){
+               if ($excludeduser -eq "All" -or $excludeduser -eq "None" -or $excludeduser -eq $Null){
+                    $ExcludedADUsername = [string]$ExcludedADUsername
+               }
+               else{
+                    $ExcludedADUsername = foreach ($user in $ExcludedUser){
+                         $ExcludedADUser = get-AzureADUser -objectID $user
+                         $ExcludedADDisplayname = $ExcludedADUser.Displayname
+                         $ExcludedADDisplayname
+                    }
+               }
+               $ExcludedADUsername
+                   
+          }
+
+          $ExcludedUsers = [string]$ExcludedUsers
+
+          $customobject | Add-Member -Membertype Noteproperty -Name "Excluded Users" -Value $ExcludedUsers
+
+          #Same as above except for Included Groups.
+          $IncludedGroups = foreach($includedgroup in $Policy.Conditions.Users.IncludeGroups){
+               If ($includedgroup -eq "All" -or $includedgroup -eq "None" -or $includedgroup -eq $Null){
+                    $includedADGroupName = $IncludedGroup
+               }
+               else{
+                    $IncludedGroupname = foreach ($group in $IncludedGroup){
+                         $IncludedADGroup = get-AzureADGroup -ObjectId $group
+                         $IncludedADGroupDisplayname = $IncludedADGroup.DisplayName
+                         $IncludedADGroupDisplayname
+     
+                    }
+               }
+               $IncludedADGroupDisplayname
+     
+          }
+          
+          $IncludedGroups = [string]$IncludedGroups
+
+          $customobject | Add-Member -Membertype Noteproperty -Name "Included Groups" -Value $IncludedGroups
+
+          #Same as above except for Excluded Groups.
+          $ExcludedGroups = foreach ($excludedgroup in $Policy.conditions.users.ExcludeGroups){
+               If ($excludedgroup -eq "All" -or $excludedgroup -eq "None" -or $excludedgroup -eq $Null){
+                    $excludedADGroupName = $excludedGroup
+               }
+               else{
+                    $ExcludedADGroupname = foreach ($group in $ExcludedUser){
+                         $ExcludedADGroup = get-AzureADGroup -objectID $excludedgroup
+                         $ExcludedADGroupDisplayname = $ExcludedADGroup.Displayname
+                         $ExcludedADGroupDisplayname
+
+                    }
+               }          
+               $ExcludedADGroupname
+                   
+          }
+
+          $ExcludedUsers = [string]$ExcludedGroups
+
+          $customobject | Add-Member -Membertype Noteproperty -Name "Excluded Groups" -Value $ExcludedGroups
+
+          #Returns the finished $customobject and puts it into $Report.
+          $customobject
+
+     }
+
+#Exports the result that was put into $Report to a csv file.
+$Report | export-csv .\$Tenant" Conditional Access Report".csv -NoTypeInformation
+}
+
+#Disconnects from AzureAD to ensure no linger sessions.
+Disconnect-AzureAD
+
+#Clears variables to ensure no lingering information in memory
+$CompanyName = ''
+$Report = ''
+$Policies = ''
+$policy = ''
+$customobject = ''
+$user = ''
+$IncludedUsers = ''
+$includeduser = ''
+$includedADUsername = ''
+$includedADUser = ''
+$includedADDisplayname = ''
+$ExcludedUsers = ''
+$excludeduser = ''
+$ExcludedADUsername = ''
+$ExcludedADUser = ''
+$ExcludedADDisplayname = ''
+$group = ''
+$IncludedGroups = ''
+$includedgroup = ''
+$includedADGroupname = ''
+$includedADgroup = ''
+$includedADGroupDisplayname = ''
+$ExcludedGroups = ''
+$excludedgroup = ''
+$ExcludedADGroupname = ''
+$ExcludedADGroup = ''
+$ExcludedADGroupDisplayname = ''
